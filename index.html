@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bill Splitter</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            /* Використовуємо змінні Telegram для адаптації під тему користувача */
+            --bg-color: var(--tg-theme-bg-color, #fff);
+            --text-color: var(--tg-theme-text-color, #000);
+            --hint-color: var(--tg-theme-hint-color, #999);
+            --btn-color: var(--tg-theme-button-color, #3390ec);
+            --btn-text: var(--tg-theme-button-text-color, #fff);
+            --secondary-bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            --red: #ff3b30;
+            --green: #34c759;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            padding: 15px;
+            margin: 0;
+            padding-bottom: 90px; /* Місце для футера */
+        }
+
+        /* --- Блоки --- */
+        .card {
+            background: var(--secondary-bg);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        h3 { margin: 0 0 10px 0; font-size: 16px; opacity: 0.8; }
+
+        /* --- Input --- */
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            border: 1px solid var(--hint-color);
+            border-radius: 8px;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 16px;
+            margin-bottom: 10px;
+            outline: none;
+        }
+        input:focus { border-color: var(--btn-color); }
+
+        /* --- Кнопки швидкого вибору (чіпи) --- */
+        .chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .chip {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid var(--btn-color);
+            color: var(--btn-color);
+            background: var(--bg-color);
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .chip:active { transform: scale(0.95); }
+        
+        /* Чіп, коли він вже доданий до списку */
+        .chip.added {
+            background: var(--secondary-bg);
+            border-color: var(--hint-color);
+            color: var(--hint-color);
+            cursor: default;
+        }
+
+        /* --- Активні учасники --- */
+        .participant-tag {
+            background: var(--btn-color);
+            color: var(--btn-text);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        .participant-tag span {
+            margin-left: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        /* --- Список покупок --- */
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--hint-color);
+        }
+        .item-row:last-child { border-bottom: none; }
+        .item-info { display: flex; flex-direction: column; }
+        .item-sub { font-size: 12px; color: var(--hint-color); }
+        .delete-icon { color: var(--red); cursor: pointer; padding: 5px; font-size: 18px; }
+
+        /* --- Кнопки --- */
+        .btn {
+            background-color: var(--btn-color);
+            color: var(--btn-text);
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            width: 100%;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--btn-color);
+            color: var(--btn-color);
+            margin-bottom: 10px;
+        }
+
+        /* --- Вибір платників (Hidden) --- */
+        .payers-dropdown {
+            display: none;
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--hint-color);
+        }
+        .payers-dropdown.show { display: block; }
+        
+        .checkbox-row {
+            display: flex; align-items: center; padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .checkbox-row:last-child { border-bottom: none; }
+        input[type="checkbox"] { transform: scale(1.3); margin-right: 10px; }
+
+        /* --- Футер --- */
+        .footer {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: var(--bg-color);
+            padding: 15px;
+            border-top: 1px solid #eee;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        .total-row {
+            display: flex; justify-content: space-between;
+            font-size: 18px; font-weight: bold; margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Назва івенту -->
+    <input type="text" id="eventName" placeholder="Назва події (напр. Бар 🍺)">
+
+    <!-- Секція 1: Учасники -->
+    <div class="card">
+        <h3>👥 Хто з нами?</h3>
+        
+        <!-- Швидкий вибір (з бази даних) -->
+        <div id="quickAddContainer" style="display:none; margin-bottom: 10px;">
+            <div style="font-size: 12px; color: var(--hint-color); margin-bottom: 5px;">Швидке додавання:</div>
+            <div class="chips-container" id="suggestions"></div>
+        </div>
+
+        <!-- Активні учасники -->
+        <div id="activeParticipants" style="margin-bottom: 10px;"></div>
+
+        <!-- Ручне додавання -->
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="manualName" placeholder="Інше ім'я" style="margin:0;">
+            <button class="btn" style="width: auto;" onclick="addManualFriend()">+</button>
+        </div>
+    </div>
+
+    <!-- Секція 2: Витрати -->
+    <div class="card" style="border: 1px solid var(--btn-color);">
+        <h3>➕ Нова витрата</h3>
+        <input type="text" id="itemName" placeholder="Що купили? (напр. Піца)">
+        <input type="number" id="itemPrice" placeholder="Сума (грн)" inputmode="decimal">
+
+        <!-- Перемикач "Хто платить" -->
+        <button class="btn btn-outline" id="splitModeBtn" onclick="toggleSplitMode()">
+            Ділимо на: Всіх
+        </button>
+
+        <!-- Чекбокси для вибору (приховані) -->
+        <div class="payers-dropdown" id="payersList">
+            <div id="checkboxContainer"></div>
+        </div>
+
+        <button class="btn" onclick="addItem()">Додати в чек</button>
+    </div>
+
+    <!-- Секція 3: Список -->
+    <h3>🛒 Список чека</h3>
+    <div id="cartList" style="margin-bottom: 20px; color: var(--hint-color); text-align: center;">
+        Поки пусто
+    </div>
+
+    <!-- Фіксований низ -->
+    <div class="footer">
+        <div class="total-row">
+            <span>Разом:</span>
+            <span id="totalSum">0.00 грн</span>
+        </div>
+        <button class="btn" onclick="finish()">✅ Розрахувати</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Розгорнути на весь екран
+
+        // --- СТАН ---
+        let state = {
+            contactsFromDb: [], // "Олег", "Аня" (з URL)
+            participants: [],   // {id: 123, name: "Олег"} (ті, хто бере участь зараз)
+            items: []           // {name: "Pizza", price: 100, payerIds: [123, 456]}
+        };
+
+        let isCustomSplit = false;
+
+        // --- ІНІЦІАЛІЗАЦІЯ ---
+        window.onload = function() {
+            // 1. Читаємо URL параметри
+            const params = new URLSearchParams(window.location.search);
+            const contactsRaw = params.get('contacts');
+            
+            if (contactsRaw) {
+                try {
+                    state.contactsFromDb = JSON.parse(contactsRaw);
+                    renderSuggestions();
+                } catch (e) { console.error("Error parsing contacts", e); }
+            }
+        };
+
+        // --- ЛОГІКА УЧАСНИКІВ ---
+        function renderSuggestions() {
+            const container = document.getElementById('suggestions');
+            const wrapper = document.getElementById('quickAddContainer');
+            
+            if (state.contactsFromDb.length === 0) {
+                wrapper.style.display = 'none';
+                return;
+            }
+            wrapper.style.display = 'block';
+            container.innerHTML = '';
+
+            state.contactsFromDb.forEach(name => {
+                // Перевіряємо, чи вже доданий
+                const isAdded = state.participants.some(p => p.name === name);
+                
+                const chip = document.createElement('div');
+                chip.className = `chip ${isAdded ? 'added' : ''}`;
+                chip.innerText = isAdded ? `✓ ${name}` : `+ ${name}`;
+                
+                if (!isAdded) {
+                    chip.onclick = () => addParticipant(name);
+                }
+                container.appendChild(chip);
+            });
+        }
+
+        function addManualFriend() {
+            const input = document.getElementById('manualName');
+            const name = input.value.trim();
+            if (name) {
+                addParticipant(name);
+                input.value = '';
+            }
+        }
+
+        function addParticipant(name) {
+            // Унікальний ID для сесії
+            const newId = Date.now() + Math.floor(Math.random() * 1000);
+            state.participants.push({ id: newId, name: name });
+            
+            updateUI();
+        }
+
+        function removeParticipant(id) {
+            state.participants = state.participants.filter(p => p.id !== id);
+            
+            // Видаляємо цю людину з усіх витрат, щоб не було помилок в математиці
+            state.items.forEach(item => {
+                if (item.payerIds) {
+                    item.payerIds = item.payerIds.filter(pid => pid !== id);
+                }
+            });
+
+            updateUI();
+        }
+
+        function updateUI() {
+            // 1. Оновити чіпи (зробити сірими доданих)
+            renderSuggestions();
+
+            // 2. Оновити список активних учасників
+            const activeDiv = document.getElementById('activeParticipants');
+            activeDiv.innerHTML = '';
+            state.participants.forEach(p => {
+                activeDiv.innerHTML += `
+                    <div class="participant-tag">
+                        ${p.name} <span onclick="removeParticipant(${p.id})">×</span>
+                    </div>`;
+            });
+
+            // 3. Оновити чекбокси у формі додавання витрат
+            renderCheckboxes();
+        }
+
+        // --- ЛОГІКА ВИТРАТ ---
+        function toggleSplitMode() {
+            if (state.participants.length === 0) {
+                tg.showAlert("Спочатку додайте людей!");
+                return;
+            }
+            isCustomSplit = !isCustomSplit;
+            const btn = document.getElementById('splitModeBtn');
+            const list = document.getElementById('payersList');
+
+            if (isCustomSplit) {
+                btn.innerText = "👇 Оберіть хто платить";
+                btn.style.background = "var(--secondary-bg)";
+                list.classList.add('show');
+            } else {
+                btn.innerText = "Ділимо на: Всіх";
+                btn.style.background = "transparent";
+                list.classList.remove('show');
+            }
+        }
+
+        function renderCheckboxes() {
+            const container = document.getElementById('checkboxContainer');
+            container.innerHTML = '';
+            state.participants.forEach(p => {
+                container.innerHTML += `
+                    <div class="checkbox-row">
+                        <input type="checkbox" class="payer-checkbox" value="${p.id}" checked>
+                        <span>${p.name}</span>
+                    </div>`;
+            });
+        }
+
+        function addItem() {
+            const nameInp = document.getElementById('itemName');
+            const priceInp = document.getElementById('itemPrice');
+            const name = nameInp.value.trim();
+            const price = parseFloat(priceInp.value);
+
+            if (!name || isNaN(price) || price <= 0) {
+                tg.showAlert("Введіть назву та суму"); return;
+            }
+            if (state.participants.length === 0) {
+                tg.showAlert("Немає учасників"); return;
+            }
+
+            let selectedIds = null; // null = всі
+            if (isCustomSplit) {
+                const checked = document.querySelectorAll('.payer-checkbox:checked');
+                selectedIds = Array.from(checked).map(cb => parseInt(cb.value));
+                
+                if (selectedIds.length === 0) {
+                    tg.showAlert("Оберіть хоча б одну людину"); return;
+                }
+                // Якщо вибрали всіх галочками, це те саме що "Всі"
+                if (selectedIds.length === state.participants.length) {
+                    selectedIds = null;
+                }
+            }
+
+            state.items.push({ name, price, payerIds: selectedIds });
+
+            // Скидання полів
+            nameInp.value = '';
+            priceInp.value = '';
+            isCustomSplit = true; toggleSplitMode(); // Повернути на "Всіх"
+            
+            renderCart();
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cartList');
+            const totalLabel = document.getElementById('totalSum');
+            
+            if (state.items.length === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--hint-color)">Список порожній</div>';
+                totalLabel.innerText = "0.00 грн";
+                return;
+            }
+
+            list.innerHTML = '';
+            let total = 0;
+
+            state.items.forEach((item, idx) => {
+                total += item.price;
+                
+                let payersText = "Всі";
+                if (item.payerIds) {
+                    const names = item.payerIds.map(pid => {
+                        const p = state.participants.find(x => x.id === pid);
+                        return p ? p.name : '';
+                    }).filter(n => n);
+                    payersText = names.join(', ');
+                }
+
+                list.innerHTML += `
+                    <div class="item-row">
+                        <div class="item-info">
+                            <span style="font-weight:500">${item.name}</span>
+                            <span class="item-sub">👥 ${payersText}</span>
+                        </div>
+                        <div style="display:flex; align-items:center;">
+                            <span style="font-weight:bold; margin-right:10px;">${item.price}</span>
+                            <span class="delete-icon" onclick="deleteItem(${idx})">×</span>
+                        </div>
+                    </div>`;
+            });
+
+            totalLabel.innerText = total.toFixed(2) + " грн";
+        }
+
+        function deleteItem(idx) {
+            state.items.splice(idx, 1);
+            renderCart();
+        }
+
+        // --- ФІНІШ ---
+        function finish() {
+            if (state.items.length === 0) return;
+
+            const eventName = document.getElementById('eventName').value || "Подія";
+            let debts = {};
+            
+            // Init debts
+            state.participants.forEach(p => debts[p.id] = 0);
+            let totalSum = 0;
+
+            state.items.forEach(item => {
+                totalSum += item.price;
+                
+                // Визначаємо, на кого ділити (якщо payerIds null, то беремо всіх поточних учасників)
+                let payers = item.payerIds ? item.payerIds : state.participants.map(p => p.id);
+                
+                // Фільтруємо (про всяк випадок, якщо когось видалили після додавання товару)
+                payers = payers.filter(pid => state.participants.find(p => p.id === pid));
+
+                if (payers.length > 0) {
+                    const perPerson = item.price / payers.length;
+                    payers.forEach(pid => {
+                        if (debts[pid] !== undefined) debts[pid] += perPerson;
+                    });
+                }
+            });
+
+            // Формуємо результат
+            const details = state.participants.map(p => ({
+                name: p.name,
+                amount: debts[p.id].toFixed(2)
+            })).filter(d => parseFloat(d.amount) > 0); // Не показувати тих, хто винен 0
+
+            const payload = {
+                title: eventName,
+                total: totalSum.toFixed(2),
+                details: details
+            };
+
+            tg.sendData(JSON.stringify(payload));
+        }
+    </script>
+</body>
+</html>

@@ -7,7 +7,6 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            /* Використовуємо змінні Telegram для адаптації під тему користувача */
             --bg-color: var(--tg-theme-bg-color, #fff);
             --text-color: var(--tg-theme-text-color, #000);
             --hint-color: var(--tg-theme-hint-color, #999);
@@ -24,10 +23,8 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             padding: 15px;
             margin: 0;
-            padding-bottom: 90px; /* Місце для футера */
+            padding-bottom: 90px;
         }
-
-        /* --- Блоки --- */
         .card {
             background: var(--secondary-bg);
             padding: 15px;
@@ -52,7 +49,6 @@
         }
         input:focus { border-color: var(--btn-color); }
 
-        /* --- Кнопки швидкого вибору (чіпи) --- */
         .chips-container {
             display: flex;
             flex-wrap: wrap;
@@ -72,7 +68,6 @@
         }
         .chip:active { transform: scale(0.95); }
         
-        /* Чіп, коли він вже доданий до списку */
         .chip.added {
             background: var(--secondary-bg);
             border-color: var(--hint-color);
@@ -80,7 +75,6 @@
             cursor: default;
         }
 
-        /* --- Активні учасники --- */
         .participant-tag {
             background: var(--btn-color);
             color: var(--btn-text);
@@ -99,7 +93,6 @@
             opacity: 0.7;
         }
 
-        /* --- Список покупок --- */
         .item-row {
             display: flex;
             justify-content: space-between;
@@ -112,7 +105,6 @@
         .item-sub { font-size: 12px; color: var(--hint-color); }
         .delete-icon { color: var(--red); cursor: pointer; padding: 5px; font-size: 18px; }
 
-        /* --- Кнопки --- */
         .btn {
             background-color: var(--btn-color);
             color: var(--btn-text);
@@ -132,7 +124,6 @@
             margin-bottom: 10px;
         }
 
-        /* --- Вибір платників (Hidden) --- */
         .payers-dropdown {
             display: none;
             background: var(--bg-color);
@@ -150,7 +141,6 @@
         .checkbox-row:last-child { border-bottom: none; }
         input[type="checkbox"] { transform: scale(1.3); margin-right: 10px; }
 
-        /* --- Футер --- */
         .footer {
             position: fixed;
             bottom: 0; left: 0; right: 0;
@@ -168,14 +158,11 @@
 </head>
 <body>
 
-    <!-- Назва івенту -->
     <input type="text" id="eventName" placeholder="Назва події (напр. Бар 🍺)">
 
-    <!-- Секція 1: Учасники -->
     <div class="card">
         <h3>👥 Хто з нами?</h3>
         
-        <!-- Швидкий вибір (з бази даних) -->
         <div id="quickAddContainer" style="display:none; margin-bottom: 10px;">
             <div style="font-size: 12px; color: var(--hint-color); margin-bottom: 5px;">Швидке додавання:</div>
             <div class="chips-container" id="suggestions"></div>
@@ -197,12 +184,10 @@
         <input type="text" id="itemName" placeholder="Що купили? (напр. Піца)">
         <input type="number" id="itemPrice" placeholder="Сума (грн)" inputmode="decimal">
 
-        <!-- Перемикач "Хто платить" -->
         <button class="btn btn-outline" id="splitModeBtn" onclick="toggleSplitMode()">
             Ділимо на: Всіх
         </button>
 
-        <!-- Чекбокси для вибору (приховані) -->
         <div class="payers-dropdown" id="payersList">
             <div id="checkboxContainer"></div>
         </div>
@@ -210,13 +195,11 @@
         <button class="btn" onclick="addItem()">Додати в чек</button>
     </div>
 
-    <!-- Секція 3: Список -->
     <h3>🛒 Список чека</h3>
     <div id="cartList" style="margin-bottom: 20px; color: var(--hint-color); text-align: center;">
         Поки пусто
     </div>
 
-    <!-- Фіксований низ -->
     <div class="footer">
         <div class="total-row">
             <span>Разом:</span>
@@ -227,20 +210,17 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Розгорнути на весь екран
+        tg.expand(); 
 
-        // --- СТАН ---
         let state = {
-            contactsFromDb: [], // "Олег", "Аня" (з URL)
-            participants: [],   // {id: 123, name: "Олег"} (ті, хто бере участь зараз)
-            items: []           // {name: "Pizza", price: 100, payerIds: [123, 456]}
+            contactsFromDb: [], 
+            participants: [],   
+            items: []          
         };
 
         let isCustomSplit = false;
 
-        // --- ІНІЦІАЛІЗАЦІЯ ---
         window.onload = function() {
-            // 1. Читаємо URL параметри
             const params = new URLSearchParams(window.location.search);
             const contactsRaw = params.get('contacts');
             
@@ -265,7 +245,6 @@
             container.innerHTML = '';
 
             state.contactsFromDb.forEach(name => {
-                // Перевіряємо, чи вже доданий
                 const isAdded = state.participants.some(p => p.name === name);
                 
                 const chip = document.createElement('div');
@@ -289,7 +268,6 @@
         }
 
         function addParticipant(name) {
-            // Унікальний ID для сесії
             const newId = Date.now() + Math.floor(Math.random() * 1000);
             state.participants.push({ id: newId, name: name });
             
@@ -299,7 +277,6 @@
         function removeParticipant(id) {
             state.participants = state.participants.filter(p => p.id !== id);
             
-            // Видаляємо цю людину з усіх витрат, щоб не було помилок в математиці
             state.items.forEach(item => {
                 if (item.payerIds) {
                     item.payerIds = item.payerIds.filter(pid => pid !== id);
@@ -310,10 +287,8 @@
         }
 
         function updateUI() {
-            // 1. Оновити чіпи (зробити сірими доданих)
             renderSuggestions();
 
-            // 2. Оновити список активних учасників
             const activeDiv = document.getElementById('activeParticipants');
             activeDiv.innerHTML = '';
             state.participants.forEach(p => {
@@ -323,11 +298,9 @@
                     </div>`;
             });
 
-            // 3. Оновити чекбокси у формі додавання витрат
             renderCheckboxes();
         }
 
-        // --- ЛОГІКА ВИТРАТ ---
         function toggleSplitMode() {
             if (state.participants.length === 0) {
                 tg.showAlert("Спочатку додайте людей!");
@@ -381,7 +354,6 @@
                 if (selectedIds.length === 0) {
                     tg.showAlert("Оберіть хоча б одну людину"); return;
                 }
-                // Якщо вибрали всіх галочками, це те саме що "Всі"
                 if (selectedIds.length === state.participants.length) {
                     selectedIds = null;
                 }
@@ -389,10 +361,9 @@
 
             state.items.push({ name, price, payerIds: selectedIds });
 
-            // Скидання полів
             nameInp.value = '';
             priceInp.value = '';
-            isCustomSplit = true; toggleSplitMode(); // Повернути на "Всіх"
+            isCustomSplit = true; toggleSplitMode();
             
             renderCart();
         }
@@ -443,24 +414,20 @@
             renderCart();
         }
 
-        // --- ФІНІШ ---
         function finish() {
             if (state.items.length === 0) return;
 
             const eventName = document.getElementById('eventName').value || "Подія";
             let debts = {};
             
-            // Init debts
             state.participants.forEach(p => debts[p.id] = 0);
             let totalSum = 0;
 
             state.items.forEach(item => {
                 totalSum += item.price;
                 
-                // Визначаємо, на кого ділити (якщо payerIds null, то беремо всіх поточних учасників)
                 let payers = item.payerIds ? item.payerIds : state.participants.map(p => p.id);
                 
-                // Фільтруємо (про всяк випадок, якщо когось видалили після додавання товару)
                 payers = payers.filter(pid => state.participants.find(p => p.id === pid));
 
                 if (payers.length > 0) {
@@ -471,11 +438,10 @@
                 }
             });
 
-            // Формуємо результат
             const details = state.participants.map(p => ({
                 name: p.name,
                 amount: debts[p.id].toFixed(2)
-            })).filter(d => parseFloat(d.amount) > 0); // Не показувати тих, хто винен 0
+            })).filter(d => parseFloat(d.amount) > 0); 
 
             const payload = {
                 title: eventName,
